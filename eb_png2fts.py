@@ -231,7 +231,7 @@ class EbTileset:
 
     def to_fts(self, filepath):
         """Writes a .fts file containing the data for the tileset"""
-        with open(filepath, 'w', encoding='utf-8') as fts_file:
+        with open(filepath, 'w', encoding='utf-8', newline='\n') as fts_file:
             # First, 512 tile graphics definition:
             # All 64 pixels for the BACKGROUND tile. Each digit is an index into palette (0..F)
             # All 64 pixels for the FOREGROUND tile. Each digit is an index into palette (0..F)
