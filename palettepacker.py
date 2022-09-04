@@ -18,10 +18,10 @@ class _AnnealingParameters:
     NUM_ANNEALING_RUNS = 32
     E_SCALE = 1 / 40
     @staticmethod
-    def T(x: float) -> float:
+    def T(x):
         return x ** 2
     @staticmethod
-    def P(E: float, En: float, T: float) -> float:
+    def P(E, En, T):
         if T == 0:
             return 0
         expP = (En-E) * _AnnealingParameters.E_SCALE / T
@@ -32,15 +32,12 @@ class _AnnealingParameters:
 class UnsolvableException(Exception):
     pass
 
-State = frozenset[frozenset[int]]
-Palettes = frozenset[frozenset[int]]
-
-def _approximatePalettes(paletteData: list[frozenset[int]]) -> Palettes:
+def _approximatePalettes(paletteData):
     # Set of palettes which we will modify during processing.
     pals = set(paletteData)
     # Set of palettes that have reached the max. num of colours and don't
     # need to be considered during processing.
-    donepals: set[frozenset[int]] = set()
+    donepals = set()
     while True:
         merged = False
         # Remove simple subsets and full ("done") palettes
@@ -116,12 +113,12 @@ def _approximatePalettes(paletteData: list[frozenset[int]]) -> Palettes:
         break
     return frozenset(donepals | pals)
 
-def _simulatedAnnealing(paletteData: list[frozenset[int]], approximation: Palettes) -> list[frozenset[int]]:
+def _simulatedAnnealing(paletteData, approximation):
     # Get the parameters class from earlier on in the file for easier reference.
     params = _AnnealingParameters
 
     @lru_cache
-    def palettesFromState(s: State) -> Palettes:
+    def palettesFromState(s):
         # Given the sets of all tile palettes in the different subpalettes,
         # create the set of colours in the subpalettes.
         def mergePaletteIndices(pidxs):
@@ -134,7 +131,7 @@ def _simulatedAnnealing(paletteData: list[frozenset[int]], approximation: Palett
         return frozenset(mergePaletteIndices(pidxs) for pidxs in s)
 
     @lru_cache
-    def EFromPalettes(sp: Palettes) -> float:
+    def EFromPalettes(sp):
         e = 0
         # For each subpalette, calculate the energy resulting from that
         # subpalette. (Lower is better, annealing algo. minimizes this energy)
@@ -151,11 +148,11 @@ def _simulatedAnnealing(paletteData: list[frozenset[int]], approximation: Palett
                 e += 50 * (l - MAX_COLOURS)
         return e
 
-    def E(s: State) -> float:
+    def E(s):
         sp = palettesFromState(s)
         return EFromPalettes(sp)
 
-    def neighbour(s: State, rng: Random) -> State:
+    def neighbour(s, rng):
         # Move one tile palette from one subpalette to another, to create
         # a neighbouring state snew from s.
         subList = list(s)
@@ -188,7 +185,7 @@ def _simulatedAnnealing(paletteData: list[frozenset[int]], approximation: Palett
         # Return the new modified subpalettes in the correct state format.
         return frozenset(subList + [frozenset(subSrc), frozenset(subDst)])
 
-    def generateS0(rng: Random) -> State:
+    def generateS0(rng):
         '''
         Generate the initial state for the simulated annealing, based on the
         approximate results passed in.
@@ -246,7 +243,7 @@ def _simulatedAnnealing(paletteData: list[frozenset[int]], approximation: Palett
                 Es = Esnew
     return sorted(palettesFromState(bestS), key=lambda p: -len(p))
 
-def tilePalettesToSubpalettes(paletteData: list[list[int]]) -> tuple[list[list[int]], dict[int, int]]:
+def tilePalettesToSubpalettes(paletteData):
     '''
     Given a list of tile palettes, this function will fit them into subpalettes
     and return both the subpalettes and the mapping from the index into the
@@ -291,7 +288,7 @@ def tilePalettesToSubpalettes(paletteData: list[list[int]]) -> tuple[list[list[i
     if any(len(subPal) > MAX_COLOURS for subPal in finalSubpalettesSet):
         raise UnsolvableException("Unable to find a solution")
     # Calculate the subpalette index for each input palette
-    tileToSubpaletteMap: dict[int, int] = {}
+    tileToSubpaletteMap = {}
     for iTile, tilePal in enumerate(paletteData):
         for iSub, subPal in enumerate(finalSubpalettesSet):
             if frozenset(tilePal).issubset(subPal):
