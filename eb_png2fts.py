@@ -1,6 +1,7 @@
 import argparse
 
 import image_cropper
+import palettepacker
 
 from PIL import Image, ImageOps
 
@@ -190,19 +191,28 @@ class EbTileset:
     def append_from_image(self, image):
         """Adds unique chunks and tiles from an image into the tileset"""
         chunk_images = image_cropper.get_tiles(image, tile_size=32)
-
+        chunk_tile_images = []
+        tile_palettes = []
         for im_chunk in chunk_images:
             tile_images = image_cropper.get_tiles(im_chunk, tile_size=8)
-
-            chunk_tiles = []
+            chunk_tile_images.append(tile_images)
             for im_tile in tile_images:
                 colors = im_tile.getcolors(15) # (count, (r,g,b))
                 if colors is None:
                     raise PaletteError('A single tile had more than 15 colors.')
 
                 colors = [rgb for _, rgb in colors] # Discard pixel count
-                palette_row = self.palette.add_colors(colors)
+                tile_palettes.append(colors)
 
+        # Use palettepacker library to perform better packing of
+        # palettes into subpalettes
+        self.palette.subpalettes, subpalette_map = \
+            palettepacker.tilePalettesToSubpalettes(tile_palettes)
+
+        for chunk_idx, tile_images in enumerate(chunk_tile_images):
+            chunk_tiles = []
+            for tile_idx, im_tile in enumerate(tile_images):
+                palette_row = subpalette_map[chunk_idx * 16 + tile_idx]
                 subpalette = self.palette.subpalettes[palette_row]
                 image_data = list(im_tile.getdata())
                 tile_data = tuple(tuple(subpalette.index(c)+1 for c in image_data[i:i+8]) for i in range(0, 64, 8))
