@@ -181,6 +181,11 @@ class EbTileset:
         if 0 > tileset_id > 19:
             raise ValueError('Tileset ID must be in range 0..19')
 
+        # Data set prior to calling compute()
+        self.chunk_tile_images = []
+        self.tile_palettes = []
+
+        # Data set by compute()
         self.tile_index = 0 # Index for next unique tile
         self.tileset_id = tileset_id
         self.chunks = []
@@ -191,25 +196,24 @@ class EbTileset:
     def append_from_image(self, image):
         """Adds unique chunks and tiles from an image into the tileset"""
         chunk_images = image_cropper.get_tiles(image, tile_size=32)
-        chunk_tile_images = []
-        tile_palettes = []
         for im_chunk in chunk_images:
             tile_images = image_cropper.get_tiles(im_chunk, tile_size=8)
-            chunk_tile_images.append(tile_images)
+            self.chunk_tile_images.append(tile_images)
             for im_tile in tile_images:
                 colors = im_tile.getcolors(15) # (count, (r,g,b))
                 if colors is None:
                     raise PaletteError('A single tile had more than 15 colors.')
 
                 colors = [rgb for _, rgb in colors] # Discard pixel count
-                tile_palettes.append(colors)
+                self.tile_palettes.append(colors)
 
+    def compute(self):
         # Use palettepacker library to perform better packing of
         # palettes into subpalettes
         self.palette.subpalettes, subpalette_map = \
-            palettepacker.tilePalettesToSubpalettes(tile_palettes)
+            palettepacker.tilePalettesToSubpalettes(self.tile_palettes)
 
-        for chunk_idx, tile_images in enumerate(chunk_tile_images):
+        for chunk_idx, tile_images in enumerate(self.chunk_tile_images):
             chunk_tiles = []
             for tile_idx, im_tile in enumerate(tile_images):
                 palette_row = subpalette_map[chunk_idx * 16 + tile_idx]
@@ -302,6 +306,8 @@ def main(args):
             image = ImageOps.posterize(image, 5) # 5-bit color
 
             tileset.append_from_image(image)
+
+    tileset.compute()
 
     print('Done!')
     print(f'{len(tileset.chunks)} chunks!')
