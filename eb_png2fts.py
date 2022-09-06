@@ -20,21 +20,6 @@ class EbPalette:
         self.backdrop = backdrop
         self.subpalettes = [[] for _ in range(6)]
 
-    def add_colors(self, new_colors):
-        """Adds colors to this palette, fitting them into the first possible subpalette
-
-           Returns the index of the subpalette where the colors where added
-        """
-        for subpal_index, subpal_colors in enumerate(self.subpalettes):
-            unique_colors = [c for c in new_colors if c not in subpal_colors]
-            if len(subpal_colors + unique_colors) < 16:
-                subpal_colors += unique_colors
-                return subpal_index
-
-        # image = self.to_image()
-        # image.save('TEST/crapped_palette.png')
-        raise PaletteError("Too many colors! Couldn't fit any more colors into the palette...")
-
     def to_image(self):
         """Returns an image representation of the palette"""
         im = Image.new('RGB', (16, 6), self.backdrop)
@@ -299,9 +284,6 @@ def main(args):
 
     for path in args.input_files:
         with Image.open(path) as image:
-            # TEST: LIMIT TO 32 COLORS
-            # image = image.quantize(colors=32, dither=Image.NONE)
-
             image = image.convert(mode='RGB') # Get rid of the alpha channel
             image = ImageOps.posterize(image, 5) # 5-bit color
 
@@ -313,9 +295,6 @@ def main(args):
     print(f'{len(tileset.chunks)} chunks!')
     print(f'{len(tileset.all_tiles)} tiles!')
     print(f'{len(tileset.tiles)} unique tiles!')
-
-    # im_pal = tileset.palette.to_image()
-    # im_pal.save('TEST/cool_palette.png')
 
     tileset.to_fts(args.output)
 
