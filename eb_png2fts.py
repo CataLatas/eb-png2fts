@@ -67,10 +67,12 @@ class EbTile:
         self.is_flipped_v = is_flipped_v
 
     def __eq__(self, other):
-        # Does not check index on purpose
         return (isinstance(other, type(self)) and
-                (self.data, self.palette, self.palette_row, self.is_flipped_h, self.is_flipped_v) ==
-                (other.data, other.palette, other.palette_row, self.is_flipped_h, self.is_flipped_v))
+                (self.data, self.palette, self.palette_row, self.index, self.is_flipped_h, self.is_flipped_v) ==
+                (other.data, other.palette, other.palette_row, self.index, self.is_flipped_h, self.is_flipped_v))
+
+    def __hash__(self):
+        return hash((self.data, self.palette, self.palette_row, self.index, self.is_flipped_h, self.is_flipped_v))
 
     @property
     def is_flipped(self):
@@ -81,21 +83,6 @@ class EbTile:
     def is_flipped_hv(self):
         """Returns True if the tile is flipped both horizontally and vertically"""
         return self.is_flipped_h and self.is_flipped_v
-
-    def flipped_h(self):
-        """Returns a horizontally flipped copy of the tile"""
-        data = tuple(row[::-1] for row in self.data)
-        return EbTile(data, self.palette, self.palette_row, index=self.index, is_flipped_h=True)
-
-    def flipped_v(self):
-        """Returns a vertically flipped copy of the tile"""
-        data = self.data[::-1]
-        return EbTile(data, self.palette, self.palette_row, index=self.index, is_flipped_v=True)
-
-    def flipped_hv(self):
-        """Returns a horizontally and vertically flipped copy of the tile"""
-        data = tuple(row[::-1] for row in self.data)[::-1]
-        return EbTile(data, self.palette, self.palette_row, index=self.index, is_flipped_h=True, is_flipped_v=True)
 
     def to_image(self):
         """Returns an image representation of the tile"""
@@ -109,8 +96,7 @@ class EbTile:
 
     def fts_string(self):
         """Returns the .fts string representation of the tile"""
-        flat_gen = (pixel for row in self.data for pixel in row)
-        return ''.join(HEX_DIGITS[pixel] for pixel in flat_gen)
+        return ''.join(HEX_DIGITS[pixel] for pixel in self.data)
 
 
 class EbChunk:
@@ -174,14 +160,21 @@ class EbTileset:
         self.tile_index = 0 # Index for next unique tile
         self.tileset_id = tileset_id
         self.chunks = []
-        self.tiles = [] # Only unflipped tiles
-        self.all_tiles = [] # Both unflipped and flipped tiles
+        self.tiles = []
         self.palette = EbPalette()
+        self.tile_dict = dict()
+        self._chunk_image_cache = set()
 
     def append_from_image(self, image):
         """Adds unique chunks and tiles from an image into the tileset"""
         chunk_images = image_cropper.get_tiles(image, tile_size=32)
+
         for im_chunk in chunk_images:
+            if im_chunk.tobytes() in self._chunk_image_cache:
+                continue
+
+            self._chunk_image_cache.add(im_chunk.tobytes())
+
             tile_images = image_cropper.get_tiles(im_chunk, tile_size=8)
             self.chunk_tile_images.append(tile_images)
             for im_tile in tile_images:
@@ -201,26 +194,35 @@ class EbTileset:
         for chunk_idx, tile_images in enumerate(self.chunk_tile_images):
             chunk_tiles = []
             for tile_idx, im_tile in enumerate(tile_images):
-                palette_row = subpalette_map[chunk_idx * 16 + tile_idx]
-                subpalette = self.palette.subpalettes[palette_row]
-                image_data = list(im_tile.getdata())
-                tile_data = tuple(tuple(subpalette.index(c)+1 for c in image_data[i:i+8]) for i in range(0, 64, 8))
+                im_tile_h = im_tile.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                im_tile_v = im_tile.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                im_tile_hv = im_tile_h.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
-                tile = EbTile(tile_data, self.palette, palette_row, index=self.tile_index)
+                tile_hash = im_tile.tobytes()
+                tile_h_hash = im_tile_h.tobytes()
+                tile_v_hash = im_tile_v.tobytes()
+                tile_hv_hash = im_tile_hv.tobytes()
+                if tile_hash not in self.tile_dict:
+                    palette_row = subpalette_map[chunk_idx * 16 + tile_idx]
+                    subpalette = self.palette.subpalettes[palette_row]
+                    image_data = im_tile.getdata()
+                    tile_data = tuple(subpalette.index(c)+1 for c in image_data)
 
-                # Uh.... Yeah. I don't think this looks pretty either
-                if tile not in self.all_tiles:
-                    tile_h = tile.flipped_h()
-                    tile_v = tile.flipped_v()
-                    tile_hv = tile.flipped_hv()
-                    self.all_tiles += [tile, tile_h, tile_v, tile_hv]
-
-                    self.tiles.append(tile)
+                    tile = EbTile(tile_data, self.palette, palette_row, index=self.tile_index)
+                    tile_h = EbTile(tile_data, self.palette, palette_row, index=self.tile_index, is_flipped_h=True)
+                    tile_v = EbTile(tile_data, self.palette, palette_row, index=self.tile_index, is_flipped_v=True)
+                    tile_hv = EbTile(tile_data, self.palette, palette_row, index=self.tile_index, is_flipped_h=True, is_flipped_v=True)
                     self.tile_index += 1
+
+                    self.tile_dict[tile_hash] = tile
+                    self.tile_dict[tile_h_hash] = tile_h
+                    self.tile_dict[tile_v_hash] = tile_v
+                    self.tile_dict[tile_hv_hash] = tile_hv
                 else:
-                    # Will grab the correct tile in case it's flipped
-                    # Certainly not pretty, but it works
-                    tile = self.all_tiles[self.all_tiles.index(tile)] # Will grab the correct tile in case it's flipped
+                    tile = self.tile_dict[tile_hash]
+
+                if tile not in self.tiles:
+                    self.tiles.append(tile)
 
                 chunk_tiles.append(tile)
 
@@ -230,25 +232,28 @@ class EbTileset:
 
     def to_fts(self, filepath):
         """Writes a .fts file containing the data for the tileset"""
+        if len(self.tiles) >= 512:
+            # TODO Custom exception class
+            raise RuntimeError('Oops too many unique tiles!')
+
+        if len(self.chunks) >= 1024:
+            # TODO Custom exception class
+            raise RuntimeError('Oops too many unique chunks!')
+
         with open(filepath, 'w', encoding='utf-8', newline='\n') as fts_file:
             # First, 512 tile graphics definition:
             # All 64 pixels for the BACKGROUND tile. Each digit is an index into palette (0..F)
             # All 64 pixels for the FOREGROUND tile. Each digit is an index into palette (0..F)
             # (newline here)
-            for i in range(512):
-                try:
-                    tile = self.tiles[i]
-                except IndexError:
-                    tile = None
 
-                if tile is None:
-                    graphics_str = '0' * 64
-                else:
-                    graphics_str = tile.fts_string()
+            blank_graphics_str = '0' * 64
+            for tile in self.tiles:
+                fts_file.write(f'{tile.fts_string()}\n')
+                fts_file.write(f'{blank_graphics_str}\n\n') # FOREGROUND is kept blank for now
 
-                fts_file.write(f'{graphics_str}\n')
-                fts_file.write(f'{"0" * 64}\n') # FOREGROUND is kept blank for now
-                fts_file.write('\n')
+            for i in range(len(self.tiles), 512):
+                fts_file.write(f'{blank_graphics_str}\n')
+                fts_file.write(f'{blank_graphics_str}\n\n')
 
             # Then, a newline followed by the palette information
             # AP(ppp(x16)(x6)), where:
@@ -265,18 +270,12 @@ class EbTileset:
             #   s = surface flags.
             #   Note: Inexistant chunks use "000000"
             fts_file.write('\n\n')
-            for i in range(1024):
-                try:
-                    chunk = self.chunks[i]
-                except IndexError:
-                    chunk = None
+            for chunk in self.chunks:
+                fts_file.write(f'{chunk.fts_string()}\n')
 
-                if chunk is None:
-                    chunk_str = '0' * 6*16
-                else:
-                    chunk_str = chunk.fts_string()
-
-                fts_file.write(f'{chunk_str}\n')
+            blank_chunk_str = '0' * 6*16
+            for i in range(len(self.chunks), 1024):
+                fts_file.write(f'{blank_chunk_str}\n')
 
 
 def main(args):
@@ -293,7 +292,6 @@ def main(args):
 
     print('Done!')
     print(f'{len(tileset.chunks)} chunks!')
-    print(f'{len(tileset.all_tiles)} tiles!')
     print(f'{len(tileset.tiles)} unique tiles!')
 
     tileset.to_fts(args.output)
