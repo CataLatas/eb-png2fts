@@ -188,8 +188,11 @@ class EbTileset:
     def compute(self):
         # Use palettepacker library to perform better packing of
         # palettes into subpalettes
-        self.palette.subpalettes, subpalette_map = \
+        packedSubpalettes, subpalette_map = \
             palettepacker.tilePalettesToSubpalettes(self.tile_palettes)
+        assert(len(packedSubpalettes) <= 6)
+        # Keep the length of subpalettes the same
+        self.palette.subpalettes[:len(packedSubpalettes)] = packedSubpalettes
 
         for chunk_idx, tile_images in enumerate(self.chunk_tile_images):
             chunk_tiles = []
