@@ -149,8 +149,8 @@ class EbTileset:
     """Represents a collection of unique 32x32 chunks and 8x8 tiles with a palette"""
 
     def __init__(self, tileset_id):
-        if 0 > tileset_id > 19:
-            raise ValueError('Tileset ID must be in range 0..19')
+        if 0 > tileset_id > 31:
+            raise ValueError('Tileset ID must be in range 0..31')
 
         # Data set prior to calling compute()
         self.chunk_tile_images = []
@@ -303,7 +303,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert image files into CoilSnake-compatible files for Earthbound hacking')
 
     parser.add_argument('input_files', metavar='IN_IMAGE', nargs='+', help='Input image files')
-    parser.add_argument('-t', '--tileset-id', required=True, type=int, metavar='[0-19]', choices=range(20), help='Specify the tileset ID')
+    parser.add_argument('-t', '--tileset-id', required=True, type=int, metavar='[0-31]', choices=range(32), help='Specify the tileset ID')
     parser.add_argument('-o', '--output', required=True, help='Output FTS file')
     args = parser.parse_args()
 

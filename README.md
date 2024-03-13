@@ -6,7 +6,7 @@ Convert image files into [CoilSnake](https://github.com/pk-hack/CoilSnake/)-comp
 python eb_png2fts.py [-h] IN_IMAGE [IN_IMAGE ...] -t TILESET_ID -o OUTPUT
 
 -h, --help                    Show a help message
--t, --tileset-id TILESET_ID   Specify the tileset ID (in range 0-19 inclusive)
+-t, --tileset-id TILESET_ID   Specify the tileset ("area") ID (in range 0-31 inclusive)
 -o, --output OUTPUT           Output FTS file
 IN_IMAGE                      Input image file (accepts multiple images)
 ```
